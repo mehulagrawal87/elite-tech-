@@ -1,0 +1,51 @@
+# CREATE A PIPELINE FOR DATA PREPROCESSING, TRANSFORMATION, AND LOADING USING TOOLS LIKE PANDAS AND SCIKIT-LEARN
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+
+file_path = "/content/Employee.csv"
+df = pd.read_csv(file_path)
+print("Raw Data:")
+print(df.head())
+
+X = df.drop("LeaveOrNot", axis=1)
+y = df["LeaveOrNot"]
+
+
+numeric_features = ["Age", "JoiningYear", "ExperienceInCurrentDomain"]
+categorical_features = ["Education", "City", "PaymentTier", "Gender", "EverBenched"]
+
+
+numeric_transformer = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler())
+])
+
+categorical_transformer = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("encoder", OneHotEncoder(handle_unknown="ignore"))
+])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", numeric_transformer, numeric_features),
+        ("cat", categorical_transformer, categorical_features)
+    ]
+)
+
+
+pipeline = Pipeline(steps=[("preprocessor", preprocessor)])
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+X_train_transformed = pipeline.fit_transform(X_train)
+X_test_transformed = pipeline.transform(X_test)
+
+print("\nTransformed Training Data Shape:", X_train_transformed.shape)
+print("Transformed Testing Data Shape:", X_test_transformed.shape)
