@@ -1,0 +1,45 @@
+#task 3
+import pandas as pd
+import numpy as np
+from flask import Flask, request, jsonify
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+
+df = pd.read_csv("Employee.csv")
+target_col = "LeaveOrNot"
+if target_col not in df.columns:
+    raise ValueError(f"Target column '{target_col}' not found. Available: {list(df.columns)}")
+
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+for col in X.select_dtypes(include="object").columns:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col].astype(str))
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+print(f"✅ Model trained. Accuracy: {model.score(X_test, y_test):.3f}")
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "🚀 Employee Prediction API is running! Use POST /predict"
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    try:
+        data = request.get_json()
+        features = np.array(data["features"]).reshape(1, -1)
+        pred = int(model.predict(features)[0])
+        return jsonify({"prediction": pred})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
