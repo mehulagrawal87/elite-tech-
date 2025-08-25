@@ -1,0 +1,62 @@
+#task 4# workforce_optimization.py
+import pandas as pd
+from pulp import LpProblem, LpVariable, lpSum, LpMinimize, LpBinary, PULP_CBC_CMD
+
+df = pd.read_csv("Employee.csv")
+
+print("Columns in CSV:", df.columns.tolist())
+
+if "EmployeeID" not in df.columns:
+    df["EmployeeID"] = range(1, len(df) + 1)
+
+# ------------------------------
+# 2. Define Optimization Model
+# ------------------------------
+model = LpProblem("Workforce_Optimization", LpMinimize)
+
+# Decision variables: assign employee or not
+assign = LpVariable.dicts("Assign", df["EmployeeID"], cat=LpBinary)
+
+# ------------------------------
+# 3. Objective Function: Minimize Cost
+# ------------------------------
+# Assume PaymentTier represents salary level (1=low, 2=medium, 3=high)
+model += lpSum(assign[i] * df.loc[df["EmployeeID"] == i, "PaymentTier"].values[0]
+               for i in df["EmployeeID"]), "TotalCost"
+
+# ------------------------------
+# 4. Constraints
+# ------------------------------
+
+# (a) At least 30 employees must be assigned
+model += lpSum(assign[i] for i in df["EmployeeID"]) >= 30, "MinEmployees"
+
+# (b) At least 10 employees with >3 years experience
+experienced_ids = df[df["ExperienceInCurrentDomain"] > 3]["EmployeeID"]
+model += lpSum(assign[i] for i in experienced_ids) >= 10, "MinExperienced"
+
+# (c) At least 5 employees from each Education level
+for edu in df["Education"].unique():
+    edu_ids = df[df["Education"] == edu]["EmployeeID"]
+    model += lpSum(assign[i] for i in edu_ids) >= 5, f"MinEdu_{edu}"
+
+# ------------------------------
+# 5. Solve the Model
+# ------------------------------
+model.solve(PULP_CBC_CMD(msg=0))
+
+# ------------------------------
+# 6. Results
+# ------------------------------
+selected = [i for i in df["EmployeeID"] if assign[i].value() == 1]
+total_cost = sum(df.loc[df["EmployeeID"] == i, "PaymentTier"].values[0] for i in selected)
+
+print("✅ Optimization Complete")
+print("Selected Employees:", selected)
+print("Total Cost:", total_cost)
+print("Number of Employees Assigned:", len(selected))
+
+# Save results
+df["Assigned"] = df["EmployeeID"].apply(lambda x: 1 if x in selected else 0)
+df.to_csv("optimized_assignment.csv", index=False)
+print("Results saved to optimized_assignment.csv")
